@@ -22,73 +22,48 @@ from utils.image_utils import psnr
 from argparse import ArgumentParser
 
 def readImages(renders_dir, gt_dir):
+    """读取渲染图像和真实图像，返回张量列表和图像名称"""
     renders = []
     gts = []
     image_names = []
     for fname in os.listdir(renders_dir):
         render = Image.open(renders_dir / fname)
         gt = Image.open(gt_dir / fname)
+        # 转换为张量并移动到GPU
         renders.append(tf.to_tensor(render).unsqueeze(0)[:, :3, :, :].cuda())
         gts.append(tf.to_tensor(gt).unsqueeze(0)[:, :3, :, :].cuda())
         image_names.append(fname)
     return renders, gts, image_names
 
 def evaluate(model_paths):
-
-    full_dict = {}
-    per_view_dict = {}
-    full_dict_polytopeonly = {}
-    per_view_dict_polytopeonly = {}
-    print("")
+    """评估模型渲染质量，计算SSIM、PSNR和LPIPS指标"""
+    full_dict = {}  # 存储整体评估结果
+    per_view_dict = {}  # 存储每张视图的评估结果
 
     for scene_dir in model_paths:
         try:
-            print("Scene:", scene_dir)
-            full_dict[scene_dir] = {}
-            per_view_dict[scene_dir] = {}
-            full_dict_polytopeonly[scene_dir] = {}
-            per_view_dict_polytopeonly[scene_dir] = {}
-
             test_dir = Path(scene_dir) / "test"
 
             for method in os.listdir(test_dir):
-                print("Method:", method)
-
-                full_dict[scene_dir][method] = {}
-                per_view_dict[scene_dir][method] = {}
-                full_dict_polytopeonly[scene_dir][method] = {}
-                per_view_dict_polytopeonly[scene_dir][method] = {}
-
                 method_dir = test_dir / method
                 gt_dir = method_dir/ "gt"
                 renders_dir = method_dir / "renders"
                 renders, gts, image_names = readImages(renders_dir, gt_dir)
 
+                # 计算三种质量指标
                 ssims = []
                 psnrs = []
                 lpipss = []
-
                 for idx in tqdm(range(len(renders)), desc="Metric evaluation progress"):
-                    ssims.append(ssim(renders[idx], gts[idx]))
-                    psnrs.append(psnr(renders[idx], gts[idx]))
-                    lpipss.append(lpips(renders[idx], gts[idx], net_type='vgg'))
+                    ssims.append(ssim(renders[idx], gts[idx]))  # 结构相似性
+                    psnrs.append(psnr(renders[idx], gts[idx]))  # 峰值信噪比
+                    lpipss.append(lpips(renders[idx], gts[idx], net_type='vgg'))  # 感知相似性
 
-                print("  SSIM : {:>12.7f}".format(torch.tensor(ssims).mean(), ".5"))
-                print("  PSNR : {:>12.7f}".format(torch.tensor(psnrs).mean(), ".5"))
-                print("  LPIPS: {:>12.7f}".format(torch.tensor(lpipss).mean(), ".5"))
-                print("")
-
-                full_dict[scene_dir][method].update({"SSIM": torch.tensor(ssims).mean().item(),
-                                                        "PSNR": torch.tensor(psnrs).mean().item(),
-                                                        "LPIPS": torch.tensor(lpipss).mean().item()})
-                per_view_dict[scene_dir][method].update({"SSIM": {name: ssim for ssim, name in zip(torch.tensor(ssims).tolist(), image_names)},
-                                                            "PSNR": {name: psnr for psnr, name in zip(torch.tensor(psnrs).tolist(), image_names)},
-                                                            "LPIPS": {name: lp for lp, name in zip(torch.tensor(lpipss).tolist(), image_names)}})
-
-            with open(scene_dir + "/results.json", 'w') as fp:
-                json.dump(full_dict[scene_dir], fp, indent=True)
-            with open(scene_dir + "/per_view.json", 'w') as fp:
-                json.dump(per_view_dict[scene_dir], fp, indent=True)
+                # 保存结果到JSON文件
+                with open(scene_dir + "/results.json", 'w') as fp:
+                    json.dump(full_dict[scene_dir], fp, indent=True)
+                with open(scene_dir + "/per_view.json", 'w') as fp:
+                    json.dump(per_view_dict[scene_dir], fp, indent=True)
         except:
             print("Unable to compute metrics for model", scene_dir)
 
