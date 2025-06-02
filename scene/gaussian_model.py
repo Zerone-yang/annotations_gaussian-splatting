@@ -34,36 +34,36 @@ class GaussianModel:
             L = build_scaling_rotation(scaling_modifier * scaling, rotation)
             actual_covariance = L @ L.transpose(1, 2)
             symm = strip_symmetric(actual_covariance)
-            return symm
+            return symm     # 返回协方差矩阵
         
-        self.scaling_activation = torch.exp
+        self.scaling_activation = torch.exp  # 尺度激活函数
         self.scaling_inverse_activation = torch.log
 
-        self.covariance_activation = build_covariance_from_scaling_rotation
+        self.covariance_activation = build_covariance_from_scaling_rotation     #协方差激活函数
 
-        self.opacity_activation = torch.sigmoid
+        self.opacity_activation = torch.sigmoid     #透明度激活函数
         self.inverse_opacity_activation = inverse_sigmoid
 
-        self.rotation_activation = torch.nn.functional.normalize
+        self.rotation_activation = torch.nn.functional.normalize    #旋转激活函数
 
 
     def __init__(self, sh_degree, optimizer_type="default"):
-        self.active_sh_degree = 0
+        self.active_sh_degree = 0   # 球谐函数
         self.optimizer_type = optimizer_type
         self.max_sh_degree = sh_degree  
-        self._xyz = torch.empty(0)
+        self._xyz = torch.empty(0)  # 坐标
         self._features_dc = torch.empty(0)
         self._features_rest = torch.empty(0)
-        self._scaling = torch.empty(0)
-        self._rotation = torch.empty(0)
-        self._opacity = torch.empty(0)
+        self._scaling = torch.empty(0)  # 缩放
+        self._rotation = torch.empty(0)     # 旋转
+        self._opacity = torch.empty(0)      # 不透明度
         self.max_radii2D = torch.empty(0)
         self.xyz_gradient_accum = torch.empty(0)
         self.denom = torch.empty(0)
         self.optimizer = None
-        self.percent_dense = 0
+        self.percent_dense = 0  # 百分百密集度初始化
         self.spatial_lr_scale = 0
-        self.setup_functions()
+        self.setup_functions()  # 各种激活和变换函数
 
     def capture(self):
         return (
